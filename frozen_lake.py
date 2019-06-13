@@ -369,13 +369,15 @@ def print_results(v, pi, map_size, env, beta, name):
     
     pickle.dump(v, open(name + "_" + str(map_size) + "_v.pkl", "wb"))
     pickle.dump(pi, open(name + "_" + str(map_size) + "_pi.pkl", "wb"))
-    
-def save_and_print_results(v, pi, map_size, env, beta, name):
+
+def save_and_print_results(v, pi, map_size, env, beta, name,show_val = False, show_pi = False):
     v_np, pi_np  = np.array(v), np.array(pi)
-    print("\nState Value:\n")
-    print(np.array(v_np[:-1]).reshape((map_size,map_size)))
-    print("\nPolicy:\n")
-    print(np.array(pi_np[:-1]).reshape((map_size,map_size)))
+    if(show_val):
+        print("\nState Value:\n")
+        print(np.array(v_np[:-1]).reshape((map_size,map_size)))
+    if(show_pi)
+        print("\nPolicy:\n")
+        print(np.array(pi_np[:-1]).reshape((map_size,map_size)))
     print("\nAverage reward: {}\n".format(evaluate_policy(env, pi)))
     print("Avereage discounted reward: {}\n".format(evaluate_policy_discounted(env, pi, discount_factor = beta)))
     print("State Value image view:\n")
@@ -383,6 +385,7 @@ def save_and_print_results(v, pi, map_size, env, beta, name):
     plt.imsave("latest_fig.png",np.array(v_np[:-1]).reshape((map_size,map_size)),dpi=400)
     pickle.dump(v, open(name + "_" + str(map_size) + "_v.pkl", "wb"))
     pickle.dump(pi, open(name + "_" + str(map_size) + "_pi.pkl", "wb"))
+
 
 def save_results(v,map_size):
     v_np = np.array(v)

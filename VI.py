@@ -7,7 +7,10 @@ import pickle
 import numpy as np
 
 ray.shutdown()
-ray.init(include_webui=False, ignore_reinit_error=True, redis_max_memory=500000000, object_store_memory=5000000000)
+ray.init()
+
+# A : Action Space 
+# S : State Space 
 
 @ray.remote
 class VI_worker_class(object):
@@ -36,32 +39,58 @@ class VI_worker_class(object):
                 max_error = error
         return return_vals, max_error, self.start_state
 
-def fast_value_iteration(env, beta = 0.999, epsilon = 0.01, workers_num = 4):
+def fast_value_iteration(env, beta = 0.999, epsilon = 0.01, workers_num = 4, synchronous = True):
     # Make VI server
     S = env.GetStateSpace()
     A = env.GetActionSpace()
     v_current = [0] * S
     pi = [0] * S
-    batch_inds = [(int(np.floor(i*(S/workers_num))), int(np.floor((i+1)*(S/workers_num)))) for i in range(workers_num)]
+    batch_indxs = [(int(i*(S/workers_num)), int((i+1)*(S/workers_num))) for i in range(workers_num)]
+#     print(batch_indxs) #[(0, 100), (100, 200), (200, 300), (300, 401)]
+
     # Make VI workers
-    workers_list = [VI_worker_class.remote(A, [[env.GetSuccessors(state, action) for action in range(A)] for state in range(batch_inds[i][0], batch_inds[i][1])],
-         env.TransitReward[batch_inds[i][0]:batch_inds[i][1], :], 
-         beta, batch_inds[i][0], batch_inds[i][1]) for i in range(workers_num)]
+    workers_list = [VI_worker_class.remote(A = A,
+                    successors = [[env.GetSuccessors(state, action) for action in range(A)] 
+                                for state in range(batch_indx[0], batch_indx[1])],
+                    rewards = env.TransitReward[batch_indx[0]:batch_indx[1], :], 
+                    beta = beta, 
+                    start_state = batch_indx[0], 
+                    end_state = batch_indx[1]) 
+                for batch_indx in batch_indxs]
+    
     # Do VI computation
     error = float('inf')
     while error > epsilon:
         object_list = [workers_list[i].compute.remote(v_current) for i in range(workers_num)]
         # Wait for workers to finish
-        error_list = []
-        for i in range(workers_num):
-            finish_id = ray.wait(object_list, num_returns = 1, timeout = None)[0][0]
-            object_list.remove(finish_id)
-            vals, error, start_ind = ray.get(finish_id)
-            error_list.append(error)
-            val_len = len(vals)
-            v_current[start_ind:start_ind+val_len] = [vals[i][0] for i in range(val_len)]
-            pi[start_ind:start_ind+val_len] = [vals[i][1] for i in range(val_len)]
 
-        error = max(error_list)
+        results = ray.get(object_list)
+        
+        
+        if(synchronous):
+            sum_error = 0
+            for vals, error, start_ind in  results:
+                sum_error += error
+                val_len = len(vals)
+                v_current[start_ind:start_ind+val_len] = [vals[i][0] for i in range(val_len)]
+                pi[start_ind:start_ind+val_len] = [vals[i][1] for i in range(val_len)]
+            print("Error:",sum_error)
+            error = sum_error
+            
+
+        if(not synchronous):
+            error_list = []
+            for i in range(workers_num):
+                finish_id = ray.wait(object_list, num_returns = 1, timeout = None)[0][0]
+                object_list.remove(finish_id)
+                vals, error, start_ind = ray.get(finish_id)
+                error_list.append(error)
+                val_len = len(vals)
+                v_current[start_ind:start_ind+val_len] = [vals[i][0] for i in range(val_len)]
+                pi[start_ind:start_ind+val_len] = [vals[i][1] for i in range(val_len)]
+
+                print("Error:",error)
+
+            error = max(error_list)
     
     return v_current, pi

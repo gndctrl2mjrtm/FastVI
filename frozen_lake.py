@@ -375,7 +375,7 @@ def save_and_print_results(v, pi, map_size, env, beta, name,show_val = False, sh
     if(show_val):
         print("\nState Value:\n")
         print(np.array(v_np[:-1]).reshape((map_size,map_size)))
-    if(show_pi)
+    if(show_pi):
         print("\nPolicy:\n")
         print(np.array(pi_np[:-1]).reshape((map_size,map_size)))
     print("\nAverage reward: {}\n".format(evaluate_policy(env, pi)))
@@ -390,3 +390,5 @@ def save_and_print_results(v, pi, map_size, env, beta, name,show_val = False, sh
 def save_results(v,map_size):
     v_np = np.array(v)
     plt.imsave("latest_fig.png",np.array(v_np[:-1]).reshape((map_size,map_size)),dpi=400)
+    
+    

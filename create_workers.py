@@ -4,6 +4,7 @@ import socket
 import struct
 import time
 import subprocess
+import random
 
 import ray
 
@@ -34,7 +35,7 @@ class RayCluster(object):
     def __init__(self, port: int = None, n_workers: int = None, worker_time: int = 3600,
                  verbose: bool = True, ifname='eno1', stop_existing=True):
         if port is None:
-            port = 44278
+            port = 44278-random.randint(0,100)
         else:
             try:
                 int(port)
@@ -84,15 +85,16 @@ class RayCluster(object):
         return set(ray.get([get_workers.remote() for _ in range(1000)]))
 
     def wait_for_workers(self):
-        ips = set([])
         current_n_workers = 0
-        while len(ips) != self.n_workers:
+        while True:
             ips = self.get_worker_ips()
             if self.verbose:
                 if len(ips) > current_n_workers:
                     print("Current number of workers: {}".format(current_n_workers))
                     current_n_workers = len(ips)
-            time.sleep(1e-2)
+                if current_n_workers >= self.n_workers+1:
+                    break
+            time.sleep(1e-3)
 
     def init_cluster(self, wait=True):
         self._start_ray_head()

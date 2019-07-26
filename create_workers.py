@@ -3,6 +3,7 @@ import os
 import socket
 import struct
 import time
+import subprocess
 
 import ray
 
@@ -31,9 +32,9 @@ def get_workers():
 class RayCluster(object):
 
     def __init__(self, port: int = None, n_workers: int = None, worker_time: int = 3600,
-                 verbose: bool = True, ifname='eno1'):
+                 verbose: bool = True, ifname='eno1', stop_existing=True):
         if port is None:
-            port = 44276
+            port = 44278
         else:
             try:
                 int(port)
@@ -45,6 +46,7 @@ class RayCluster(object):
             assert isinstance(n_workers, int)
             self.n_workers = n_workers
         assert isinstance(verbose, bool)
+        self.stop_existing = stop_existing
         self.ifname = ifname
         self.verbose = verbose
         self.worker_time = worker_time
@@ -59,12 +61,18 @@ class RayCluster(object):
             f.write(worker_task_config)
 
     def _start_ray_head(self):
+        if self.stop_existing:
+            os.system('ray stop')
         if ray.is_initialized():
-            raise Exception("Ray is already initialized")
+            if not self.stop_existing:
+                raise Exception("Ray is already initialized")
+
         if self.verbose:
             print("Starting ray cluster on {}:{}".format(self.host, self.port))
-        cmd = 'ray start --head --node-ip-address={} --redis-port={}'.format(self.host, self.port)
+        cmd = 'ray start --head --redis-port={}'.format(self.port)
         os.system(cmd)
+        ray.init(redis_address=self.addr)
+        print("IT CONNECTED")
 
     def _start_ray_workers(self):
         if self.verbose:
@@ -89,10 +97,9 @@ class RayCluster(object):
     def init_cluster(self, wait=True):
         self._start_ray_head()
         self._start_ray_workers()
-        if wait:
-           self.wait_for_workers()
-
+        self.wait_for_workers()
 
 if __name__ == "__main__":
-    rc = RayCluster(ifname='wlp2s0')
+    # rc = RayCluster(ifname='wlp2s0')
+    rc = RayCluster(ifname='eno1')
     rc.init_cluster()

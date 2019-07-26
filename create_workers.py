@@ -1,10 +1,10 @@
-import socket
 import fcntl
+import os
+import socket
 import struct
 import time
+
 import ray
-import sys
-import os
 
 
 def get_ip_address(ifname):
@@ -53,16 +53,22 @@ class RayCluster(object):
         self.addr = '{}:{}'.format(self.host, self.port)
         worker_task_config = worker_task.format(self.addr, self.worker_time)
         self.worker_file = 'ray_worker_script'
+        if os.path.exists(self.worker_file):
+            print("Warning, worker file already exists: {}".format(self.worker_file))
         with open(self.worker_file, 'w') as f:
             f.write(worker_task_config)
 
     def _start_ray_head(self):
         if ray.is_initialized():
             raise Exception("Ray is already initialized")
+        if self.verbose:
+            print("Starting ray cluster on {}:{}".format(self.host, self.port))
         cmd = 'ray start --head --node-ip-address={} --redis-port={}'.format(self.host, self.port)
         os.system(cmd)
 
     def _start_ray_workers(self):
+        if self.verbose:
+            print("Submitting {} worker jobs".format(self.n_workers))
         for i in range(self.n_workers):
             os.system('qsub {}'.format(self.worker_file))
 
@@ -71,16 +77,22 @@ class RayCluster(object):
 
     def wait_for_workers(self):
         ips = set([])
-        while len(ips) != self.n_workers
+        current_n_workers = 0
+        while len(ips) != self.n_workers:
             ips = self.get_worker_ips()
+            if self.verbose:
+                if len(ips) > current_n_workers:
+                    print("Current number of workers: {}".format(current_n_workers))
+                    current_n_workers = len(ips)
             time.sleep(1e-2)
 
     def init_cluster(self, wait=True):
         self._start_ray_head()
         self._start_ray_workers()
         if wait:
-            self.wait_for_workers()
+           self.wait_for_workers()
+
 
 if __name__ == "__main__":
-    rc = RayCluster()
+    rc = RayCluster(ifname='wlp2s0')
     rc.init_cluster()
